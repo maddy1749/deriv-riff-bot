@@ -1,393 +1,302 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bot>
-  <metadata>
-    <name>Riff Bot - Deriv Trading Bot</name>
+<deriv_bot>
+  <bot_info>
+    <name>Riff Bot</name>
     <version>1.0.0</version>
     <description>Automated trading bot using digit frequency analysis</description>
-    <author>maddy1749</author>
-    <created>2026-08-29</created>
-    <platform>deriv</platform>
-  </metadata>
+  </bot_info>
 
-  <settings>
-    <connection>
-      <url>wss://ws.binaryws.com/websockets/v3</url>
-      <protocol>websocket</protocol>
-      <secure>true</secure>
-    </connection>
+  <configuration>
+    <api_token></api_token>
+    <account_type>demo</account_type>
+    <currency>USD</currency>
+  </configuration>
 
-    <trading>
-      <mode>demo</mode>
-      <symbol>R_100</symbol>
-      <contractType>DIGITDIFF</contractType>
-      <stake>0.35</stake>
-      <duration>1</duration>
-      <durationUnit>t</durationUnit>
-    </trading>
+  <trading_settings>
+    <symbol>R_100</symbol>
+    <contract_type>DIGITDIFF</contract_type>
+    <stake>0.35</stake>
+    <duration>1</duration>
+    <duration_unit>t</duration_unit>
+  </trading_settings>
 
-    <strategy>
-      <analysisWindow>500</analysisWindow>
-      <threshold>0.15</threshold>
-      <maxLoss>6.00</maxLoss>
-      <maxTrades>20</maxTrades>
-      <tradeDelay>500</tradeDelay>
-    </strategy>
-  </settings>
+  <strategy>
+    <type>digit_frequency</type>
+    <analysis_window>500</analysis_window>
+    <threshold>0.15</threshold>
+    <max_loss>6.00</max_loss>
+    <max_trades>20</max_trades>
+    <trade_delay>500</trade_delay>
+  </strategy>
 
-  <logic>
-    <initialization>
-      <step>1. Connect to Deriv WebSocket API</step>
-      <step>2. Authorize with API token</step>
-      <step>3. Subscribe to market ticks</step>
-      <step>4. Load historical price data</step>
-      <step>5. Initialize digit frequency tracker</step>
-      <step>6. Start monitoring market</step>
-    </initialization>
+  <rules>
+    <rule>
+      <name>extract_digit</name>
+      <action>Extract last digit from price quote</action>
+    </rule>
+    
+    <rule>
+      <name>count_frequency</name>
+      <action>Count occurrences of digits 0-9 in analysis window</action>
+    </rule>
+    
+    <rule>
+      <name>generate_signal</name>
+      <action>If DIGITMATCH: find most frequent digit. If DIGITDIFF: find least frequent digit</action>
+    </rule>
+    
+    <rule>
+      <name>check_threshold</name>
+      <action>If DIGITMATCH and frequency >= threshold, generate BUY signal. If DIGITDIFF and frequency &lt;= threshold, generate BUY signal</action>
+    </rule>
+    
+    <rule>
+      <name>validate_trade</name>
+      <action>Check authorization, balance, max loss, max trades before executing</action>
+    </rule>
+    
+    <rule>
+      <name>execute_trade</name>
+      <action>Send proposal request and auto-buy contract</action>
+    </rule>
+    
+    <rule>
+      <name>monitor_contract</name>
+      <action>Subscribe to contract updates until settlement</action>
+    </rule>
+    
+    <rule>
+      <name>record_result</name>
+      <action>Record win/loss, update P/L and statistics</action>
+    </rule>
+  </rules>
 
-    <mainLoop>
-      <onTick>
-        <action>Extract last digit from price</action>
-        <action>Add digit to frequency array</action>
-        <action>Calculate digit frequencies</action>
-        <action>Analyze trading signal</action>
-        <condition>if signal and no active contract</condition>
-        <action>Execute trade</action>
-      </onTick>
-    </mainLoop>
+  <risk_management>
+    <max_loss>6.00</max_loss>
+    <max_trades>20</max_trades>
+    <stop_on_max_loss>true</stop_on_max_loss>
+    <stop_on_max_trades>true</stop_on_max_trades>
+  </risk_management>
 
-    <signalGeneration>
-      <type>DIGITMATCH</type>
-      <description>Trade on most frequent digit</description>
-      <logic>
-        <step>Find digit with highest frequency</step>
-        <step>Calculate frequency percentage</step>
-        <condition>if frequency >= threshold</condition>
-        <signal>Place DIGITMATCH contract on this digit</signal>
-      </logic>
+  <websocket>
+    <url>wss://ws.binaryws.com/websockets/v3</url>
+    <reconnect>true</reconnect>
+    <reconnect_delay>5000</reconnect_delay>
+  </websocket>
 
-      <type>DIGITDIFF</type>
-      <description>Trade on least frequent digit NOT appearing</description>
-      <logic>
-        <step>Find digit with lowest frequency</step>
-        <step>Calculate frequency percentage</step>
-        <condition>if frequency &lt;= threshold</condition>
-        <signal>Place DIGITDIFF contract, predict other digits appear</signal>
-      </logic>
-    </signalGeneration>
+  <operations>
+    <operation name="connect">
+      <step>1. Connect to WebSocket</step>
+      <step>2. Send authorize message with API token</step>
+      <step>3. Wait for authorization response</step>
+      <step>4. Request historical ticks</step>
+      <step>5. Subscribe to live ticks</step>
+    </operation>
 
-    <tradeExecution>
-      <step>1. Validate signal strength</step>
-      <step>2. Check risk limits (max loss, max trades)</step>
-      <step>3. Verify account has sufficient balance</step>
-      <step>4. Request proposal from Deriv API</step>
-      <step>5. Auto-buy at market price</step>
-      <step>6. Monitor contract until settlement</step>
-      <step>7. Record win/loss</step>
-      <step>8. Update P/L and statistics</step>
-      <step>9. Wait trade delay period</step>
-      <step>10. Resume monitoring for next signal</step>
-    </tradeExecution>
+    <operation name="analyze">
+      <step>1. On each new tick, extract last digit</step>
+      <step>2. Add to digits array</step>
+      <step>3. Count frequency of each digit 0-9</step>
+      <step>4. Determine max and min frequency digits</step>
+      <step>5. Calculate percentage for signal digit</step>
+      <step>6. Compare against threshold</step>
+      <step>7. If condition met, generate trade signal</step>
+    </operation>
 
-    <riskManagement>
-      <check>
-        <name>Maximum Loss Limit</name>
-        <condition>if cumulative_pl &lt;= -max_loss</condition>
-        <action>STOP BOT IMMEDIATELY</action>
-      </check>
+    <operation name="trade">
+      <step>1. Validate bot is authorized</step>
+      <step>2. Check current P/L against max_loss</step>
+      <step>3. Check trade count against max_trades</step>
+      <step>4. Verify no active contract</step>
+      <step>5. Send proposal request with signal target</step>
+      <step>6. Receive proposal with pricing</step>
+      <step>7. Send buy request at market price</step>
+      <step>8. Monitor contract status</step>
+      <step>9. When settled, record result</step>
+      <step>10. Wait trade_delay milliseconds</step>
+    </operation>
 
-      <check>
-        <name>Maximum Trades Limit</name>
-        <condition>if trade_count >= max_trades</condition>
-        <action>STOP BOT IMMEDIATELY</action>
-      </check>
+    <operation name="stop">
+      <step>1. Set running flag to false</step>
+      <step>2. Close active contract if any</step>
+      <step>3. Print final session statistics</step>
+      <step>4. Disconnect WebSocket</step>
+    </operation>
+  </operations>
 
-      <check>
-        <name>Active Contract Check</name>
-        <condition>if contract_is_open</condition>
-        <action>WAIT for settlement before next trade</action>
-      </check>
+  <messages>
+    <send_message>
+      <name>authorize</name>
+      <format>{"authorize": "API_TOKEN", "req_id": 1}</format>
+    </send_message>
 
-      <check>
-        <name>Authorization Check</name>
-        <condition>if not authorized</condition>
-        <action>BLOCK all trading</action>
-      </check>
+    <send_message>
+      <name>ticks_history</name>
+      <format>{"ticks_history": "SYMBOL", "count": 500, "end": "latest", "style": "ticks", "req_id": 2}</format>
+    </send_message>
 
-      <check>
-        <name>Balance Check</name>
-        <condition>if balance &lt; stake</condition>
-        <action>STOP BOT - insufficient funds</action>
-      </check>
-    </riskManagement>
-  </logic>
+    <send_message>
+      <name>subscribe_ticks</name>
+      <format>{"ticks": "SYMBOL", "subscribe": 1, "req_id": 3}</format>
+    </send_message>
 
-  <apiMessages>
-    <send>
-      <message>
-        <name>authorize</name>
-        <format>{"authorize": "API_TOKEN"}</format>
-        <description>Authenticate with Deriv</description>
-      </message>
+    <send_message>
+      <name>proposal</name>
+      <format>{"proposal": 1, "amount": 0.35, "basis": "stake", "contract_type": "DIGITDIFF", "currency": "USD", "duration": 1, "duration_unit": "t", "barrier": "7", "underlying_symbol": "R_100", "req_id": 4}</format>
+    </send_message>
 
-      <message>
-        <name>ticks_history</name>
-        <format>{"ticks_history": "SYMBOL", "count": 500, "end": "latest", "style": "ticks"}</format>
-        <description>Request historical tick data</description>
-      </message>
+    <send_message>
+      <name>buy</name>
+      <format>{"buy": "PROPOSAL_ID", "price": 0.35, "req_id": 5}</format>
+    </send_message>
 
-      <message>
-        <name>subscribe_ticks</name>
-        <format>{"ticks": "SYMBOL", "subscribe": 1}</format>
-        <description>Subscribe to live tick updates</description>
-      </message>
+    <send_message>
+      <name>monitor_contract</name>
+      <format>{"proposal_open_contract": 1, "contract_id": "CONTRACT_ID", "subscribe": 1, "req_id": 6}</format>
+    </send_message>
 
-      <message>
-        <name>request_proposal</name>
-        <format>{"proposal": 1, "amount": 0.35, "basis": "stake", "contract_type": "DIGITDIFF", "currency": "USD", "duration": 1, "duration_unit": "t", "barrier": "7", "underlying_symbol": "R_100"}</format>
-        <description>Request contract proposal</description>
-      </message>
+    <receive_message>
+      <name>authorize</name>
+      <fields>loginid, balance, currency, mt5_login_list</fields>
+    </receive_message>
 
-      <message>
-        <name>buy_contract</name>
-        <format>{"buy": "PROPOSAL_ID", "price": 0.35}</format>
-        <description>Execute trade</description>
-      </message>
+    <receive_message>
+      <name>history</name>
+      <fields>msg_type, history (prices array)</fields>
+    </receive_message>
 
-      <message>
-        <name>monitor_contract</name>
-        <format>{"proposal_open_contract": 1, "contract_id": "CONTRACT_ID", "subscribe": 1}</format>
-        <description>Monitor open contract</description>
-      </message>
-    </send>
+    <receive_message>
+      <name>tick</name>
+      <fields>msg_type, tick (quote, symbol, epoch)</fields>
+    </receive_message>
 
-    <receive>
-      <message>
-        <name>authorize</name>
-        <fields>
-          <field name="msg_type">authorize</field>
-          <field name="authorize">Object with loginid, balance, currency</field>
-        </fields>
-      </message>
+    <receive_message>
+      <name>proposal</name>
+      <fields>msg_type, proposal (id, ask_price, barrier, payout)</fields>
+    </receive_message>
 
-      <message>
-        <name>history</name>
-        <fields>
-          <field name="msg_type">history</field>
-          <field name="history">Object with prices array</field>
-        </fields>
-      </message>
+    <receive_message>
+      <name>buy</name>
+      <fields>msg_type, buy (contract_id, transaction_id)</fields>
+    </receive_message>
 
-      <message>
-        <name>tick</name>
-        <fields>
-          <field name="msg_type">tick</field>
-          <field name="tick">Object with quote, symbol, epoch</field>
-        </fields>
-      </message>
+    <receive_message>
+      <name>proposal_open_contract</name>
+      <fields>msg_type, proposal_open_contract (contract_id, is_sold, profit, status)</fields>
+    </receive_message>
+  </messages>
 
-      <message>
-        <name>proposal</name>
-        <fields>
-          <field name="msg_type">proposal</field>
-          <field name="proposal">Object with id, ask_price, barrier</field>
-        </fields>
-      </message>
+  <states>
+    <state>
+      <name>OFFLINE</name>
+      <description>Not connected</description>
+    </state>
+    
+    <state>
+      <name>CONNECTING</name>
+      <description>Connecting to WebSocket</description>
+    </state>
+    
+    <state>
+      <name>CONNECTED</name>
+      <description>WebSocket connected, awaiting auth</description>
+    </state>
+    
+    <state>
+      <name>AUTHORIZED</name>
+      <description>Authorized and ready</description>
+    </state>
+    
+    <state>
+      <name>RUNNING</name>
+      <description>Bot is trading</description>
+    </state>
+    
+    <state>
+      <name>STOPPED</name>
+      <description>Bot is stopped</description>
+    </state>
+  </states>
 
-      <message>
-        <name>buy</name>
-        <fields>
-          <field name="msg_type">buy</field>
-          <field name="buy">Object with contract_id, transaction_id</field>
-        </fields>
-      </message>
-
-      <message>
-        <name>proposal_open_contract</name>
-        <fields>
-          <field name="msg_type">proposal_open_contract</field>
-          <field name="proposal_open_contract">Object with contract_id, is_sold, profit, status</field>
-        </fields>
-      </message>
-    </receive>
-  </apiMessages>
-
-  <stateManagement>
-    <states>
-      <state>
-        <name>OFFLINE</name>
-        <description>Not connected to Deriv</description>
-        <transitions>
-          <transition>to:CONNECTING on connect()</transition>
-        </transitions>
-      </state>
-
-      <state>
-        <name>CONNECTING</name>
-        <description>Attempting WebSocket connection</description>
-        <transitions>
-          <transition>to:CONNECTED on successful connection</transition>
-          <transition>to:OFFLINE on connection failure</transition>
-        </transitions>
-      </state>
-
-      <state>
-        <name>CONNECTED</name>
-        <description>WebSocket connected, awaiting authorization</description>
-        <transitions>
-          <transition>to:AUTHORIZED on successful auth</transition>
-          <transition>to:OFFLINE on disconnect</transition>
-        </transitions>
-      </state>
-
-      <state>
-        <name>AUTHORIZED</name>
-        <description>Authorized with API, ready to trade</description>
-        <transitions>
-          <transition>to:RUNNING_DEMO on start() in demo mode</transition>
-          <transition>to:RUNNING_REAL on start() in real mode</transition>
-          <transition>to:OFFLINE on disconnect</transition>
-        </transitions>
-      </state>
-
-      <state>
-        <name>RUNNING_DEMO</name>
-        <description>Bot trading in demo mode</description>
-        <transitions>
-          <transition>to:STOPPED on stop()</transition>
-          <transition>to:OFFLINE on disconnect</transition>
-        </transitions>
-      </state>
-
-      <state>
-        <name>RUNNING_REAL</name>
-        <description>Bot trading with real money</description>
-        <transitions>
-          <transition>to:STOPPED on stop()</transition>
-          <transition>to:OFFLINE on disconnect</transition>
-        </transitions>
-      </state>
-
-      <state>
-        <name>STOPPED</name>
-        <description>Bot is stopped</description>
-        <transitions>
-          <transition>to:RUNNING_DEMO on start() in demo mode</transition>
-          <transition>to:RUNNING_REAL on start() in real mode</transition>
-          <transition>to:OFFLINE on disconnect</transition>
-        </transitions>
-      </state>
-    </states>
-
-    <variables>
-      <variable name="connected" type="boolean">WebSocket connection status</variable>
-      <variable name="authorized" type="boolean">API authorization status</variable>
-      <variable name="running" type="boolean">Bot trading status</variable>
-      <variable name="balance" type="number">Current account balance</variable>
-      <variable name="currency" type="string">Account currency (USD, EUR, etc)</variable>
-      <variable name="digits" type="array">Last N digit values</variable>
-      <variable name="activeContract" type="object">Currently open contract details</variable>
-      <variable name="trades" type="number">Total trades executed</variable>
-      <variable name="wins" type="number">Winning trades</variable>
-      <variable name="losses" type="number">Losing trades</variable>
-      <variable name="pl" type="number">Cumulative profit/loss</variable>
-    </variables>
-  </stateManagement>
-
-  <performance>
-    <metrics>
-      <metric name="totalTrades">Total number of trades</metric>
-      <metric name="winRate">Percentage of winning trades</metric>
-      <metric name="profitLoss">Cumulative P/L in currency</metric>
-      <metric name="avgWin">Average winning trade size</metric>
-      <metric name="avgLoss">Average losing trade size</metric>
-      <metric name="maxDrawdown">Maximum loss during session</metric>
-      <metric name="tradesPerHour">Trading frequency</metric>
-    </metrics>
-
-    <optimization>
-      <tip>Increase analysisWindow for more stable signals</tip>
-      <tip>Decrease threshold for more frequent trades</tip>
-      <tip>Increase threshold for selective trading</tip>
-      <tip>Use DIGITMATCH for trending markets</tip>
-      <tip>Use DIGITDIFF for mean-reverting markets</tip>
-      <tip>Monitor win rate and adjust accordingly</tip>
-      <tip>Test different symbols for optimal performance</tip>
-    </optimization>
-  </performance>
+  <statistics>
+    <stat name="total_trades">0</stat>
+    <stat name="wins">0</stat>
+    <stat name="losses">0</stat>
+    <stat name="profit_loss">0.00</stat>
+    <stat name="win_rate">0.00</stat>
+    <stat name="balance">0.00</stat>
+  </statistics>
 
   <security>
-    <authentication>
-      <method>Deriv API Token</method>
-      <scope>trade</scope>
-      <storage>Environment variables only</storage>
-      <transmission>WebSocket Secure (WSS)</transmission>
-      <encryption>TLS/SSL</encryption>
-    </authentication>
-
-    <requirements>
-      <requirement>Valid Deriv account</requirement>
-      <requirement>API token with trade scope</requirement>
-      <requirement>Internet connection</requirement>
-      <requirement>Sufficient account balance</requirement>
-    </requirements>
-
-    <bestPractices>
-      <practice>Never share API tokens</practice>
-      <practice>Rotate tokens regularly</practice>
-      <practice>Use separate tokens for demo and real</practice>
-      <practice>Monitor account activity</practice>
-      <practice>Set strict risk limits</practice>
-      <practice>Test in demo mode first</practice>
-      <practice>Review trade logs regularly</practice>
-    </bestPractices>
+    <requires_authorization>true</requires_authorization>
+    <token_scope>trade</token_scope>
+    <uses_wss>true</uses_wss>
+    <never_log_token>true</never_log_token>
   </security>
 
+  <error_handling>
+    <error>
+      <condition>WebSocket connection fails</condition>
+      <action>Retry with exponential backoff</action>
+    </error>
+    
+    <error>
+      <condition>Authorization fails</condition>
+      <action>Stop bot and return error message</action>
+    </error>
+    
+    <error>
+      <condition>Insufficient balance</condition>
+      <action>Stop bot and log insufficient funds</action>
+    </error>
+    
+    <error>
+      <condition>Proposal fails</condition>
+      <action>Skip trade and continue monitoring</action>
+    </error>
+    
+    <error>
+      <condition>API error response</condition>
+      <action>Log error message and continue or stop based on severity</action>
+    </error>
+  </error_handling>
+
+  <performance>
+    <recommended_settings>
+      <setting name="conservative">
+        <symbol>R_25</symbol>
+        <stake>0.35</stake>
+        <analysis_window>1000</analysis_window>
+        <threshold>0.20</threshold>
+        <max_loss>3.50</max_loss>
+        <max_trades>10</max_trades>
+      </setting>
+      
+      <setting name="balanced">
+        <symbol>R_100</symbol>
+        <stake>0.35</stake>
+        <analysis_window>500</analysis_window>
+        <threshold>0.15</threshold>
+        <max_loss>6.00</max_loss>
+        <max_trades>20</max_trades>
+      </setting>
+      
+      <setting name="aggressive">
+        <symbol>R_100</symbol>
+        <stake>1.00</stake>
+        <analysis_window>200</analysis_window>
+        <threshold>0.10</threshold>
+        <max_loss>15.00</max_loss>
+        <max_trades>50</max_trades>
+      </setting>
+    </recommended_settings>
+  </performance>
+
   <disclaimer>
-    <warning>REAL TRADING CAN RESULT IN TOTAL LOSS OF CAPITAL</warning>
-    <warning>This is a statistical strategy with no guarantee of profit</warning>
-    <warning>Frequency patterns are random and may not repeat</warning>
-    <warning>Always use appropriate risk management</warning>
-    <warning>Test thoroughly in demo mode before real trading</warning>
-    <warning>Only trade with money you can afford to lose</warning>
-    <warning>Past performance does not predict future results</warning>
-    <warning>Deriv may change API at any time</warning>
+    <warning>Real trading can result in loss of capital</warning>
+    <warning>Test in demo mode first</warning>
+    <warning>Frequency analysis provides no guarantee of profit</warning>
+    <warning>Past performance does not indicate future results</warning>
   </disclaimer>
 
-  <support>
-    <documentation>
-      <link>https://github.com/maddy1749/deriv-riff-bot</link>
-      <link>https://developers.deriv.com/</link>
-      <link>https://app.deriv.com/</link>
-    </documentation>
-
-    <troubleshooting>
-      <issue name="Bot not loading">
-        <solution>Ensure XML is valid and well-formed</solution>
-        <solution>Check all required fields are present</solution>
-        <solution>Verify API token is set</solution>
-      </issue>
-
-      <issue name="Bot not trading">
-        <solution>Check authorization status</solution>
-        <solution>Verify account has sufficient balance</solution>
-        <solution>Check strategy threshold settings</solution>
-        <solution>Monitor for error messages</solution>
-      </issue>
-
-      <issue name="Connection errors">
-        <solution>Check internet connection</solution>
-        <solution>Verify WebSocket URL is correct</solution>
-        <solution>Ensure Deriv API is accessible</solution>
-        <solution>Check firewall settings</solution>
-      </issue>
-    </troubleshooting>
-  </support>
-
-  <status>
-    <lastUpdated>2026-08-29</lastUpdated>
-    <version>1.0.0</version>
-    <buildStatus>Production Ready</buildStatus>
-    <compatibility>Deriv API v3</compatibility>
-  </status>
-
-</bot>
+</deriv_bot>
