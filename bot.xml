@@ -1,0 +1,421 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<derivBot>
+  <metadata>
+    <name>Riff Bot - Deriv Trading Bot</name>
+    <version>1.0.0</version>
+    <description>Automated trading bot using digit frequency analysis for Deriv platform</description>
+    <author>maddy1749</author>
+    <license>MIT</license>
+    <platform>deriv</platform>
+    <apiVersion>v3</apiVersion>
+  </metadata>
+
+  <connection>
+    <wsUrl>wss://ws.binaryws.com/websockets/v3</wsUrl>
+    <protocol>websocket</protocol>
+    <secure>true</secure>
+    <authentication>
+      <method>token</method>
+      <scope>trade</scope>
+      <required>true</required>
+    </authentication>
+  </connection>
+
+  <configuration>
+    <mode default="demo">
+      <option>demo</option>
+      <option>real</option>
+    </mode>
+    
+    <strategy>
+      <symbol default="R_100">
+        <option value="R_10">Volatility 10 Index</option>
+        <option value="R_25">Volatility 25 Index</option>
+        <option value="R_50">Volatility 50 Index</option>
+        <option value="R_75">Volatility 75 Index</option>
+        <option value="R_100">Volatility 100 Index</option>
+      </symbol>
+      
+      <contractType default="DIGITDIFF">
+        <option value="DIGITMATCH">Matches (Most Frequent Digit)</option>
+        <option value="DIGITDIFF">Differs (Least Frequent Digit)</option>
+      </contractType>
+      
+      <analysisWindow default="500">
+        <min>100</min>
+        <max>2000</max>
+        <description>Number of historical ticks to analyze</description>
+      </analysisWindow>
+      
+      <threshold default="0.15">
+        <min>0.001</min>
+        <max>1.0</max>
+        <step>0.001</step>
+        <description>Frequency threshold to trigger trade signal</description>
+      </threshold>
+      
+      <duration default="1">
+        <min>1</min>
+        <max>10</max>
+        <unit>ticks</unit>
+        <description>Contract duration in ticks</description>
+      </duration>
+    </strategy>
+
+    <riskManagement>
+      <stake default="0.35">
+        <min>0.35</min>
+        <currency>USD</currency>
+        <description>Amount per trade</description>
+      </stake>
+      
+      <maxLoss default="6.00">
+        <min>0.35</min>
+        <currency>USD</currency>
+        <description>Maximum cumulative loss before stopping</description>
+      </maxLoss>
+      
+      <maxTrades default="20">
+        <min>1</min>
+        <max>1000</max>
+        <description>Maximum trades per session</description>
+      </maxTrades>
+      
+      <tradeDelay default="500">
+        <min>0</min>
+        <unit>milliseconds</unit>
+        <description>Delay between trades to prevent rapid firing</description>
+      </tradeDelay>
+    </riskManagement>
+  </configuration>
+
+  <messageTypes>
+    <messageType>
+      <name>authorize</name>
+      <direction>receive</direction>
+      <description>Authorization response with account details</description>
+      <fields>
+        <field name="loginid" type="string">User login ID</field>
+        <field name="balance" type="number">Account balance</field>
+        <field name="currency" type="string">Account currency</field>
+      </fields>
+    </messageType>
+
+    <messageType>
+      <name>history</name>
+      <direction>receive</direction>
+      <description>Historical tick data</description>
+      <fields>
+        <field name="prices" type="array">Array of historical prices</field>
+        <field name="count" type="number">Number of ticks returned</field>
+      </fields>
+    </messageType>
+
+    <messageType>
+      <name>tick</name>
+      <direction>receive</direction>
+      <description>Live price update</description>
+      <fields>
+        <field name="quote" type="number">Current price quote</field>
+        <field name="symbol" type="string">Asset symbol</field>
+        <field name="epoch" type="number">Unix timestamp</field>
+      </fields>
+    </messageType>
+
+    <messageType>
+      <name>proposal</name>
+      <direction>receive</direction>
+      <description>Contract proposal with pricing</description>
+      <fields>
+        <field name="id" type="string">Proposal ID</field>
+        <field name="ask_price" type="number">Ask price</field>
+        <field name="barrier" type="string">Barrier level</field>
+      </fields>
+    </messageType>
+
+    <messageType>
+      <name>buy</name>
+      <direction>receive</direction>
+      <description>Trade execution confirmation</description>
+      <fields>
+        <field name="contract_id" type="number">Contract ID</field>
+        <field name="transaction_id" type="number">Transaction ID</field>
+      </fields>
+    </messageType>
+
+    <messageType>
+      <name>proposal_open_contract</name>
+      <direction>receive</direction>
+      <description>Open contract status and settlement</description>
+      <fields>
+        <field name="contract_id" type="number">Contract ID</field>
+        <field name="is_sold" type="boolean">Whether contract has been settled</field>
+        <field name="profit" type="number">Profit or loss on contract</field>
+        <field name="status" type="string">Contract status</field>
+      </fields>
+    </messageType>
+  </messageTypes>
+
+  <tradingEngine>
+    <digitExtraction>
+      <description>Extracts the last digit from price quotes</description>
+      <algorithm>Extract rightmost digit from price string</algorithm>
+      <example>
+        <price>12345.67</price>
+        <lastDigit>7</lastDigit>
+      </example>
+    </digitExtraction>
+
+    <frequencyAnalysis>
+      <description>Analyzes distribution of digits 0-9 across rolling window</description>
+      <window>
+        <size>500</size>
+        <unit>ticks</unit>
+      </window>
+      <metrics>
+        <metric name="mostFrequent">Digit with highest occurrence count</metric>
+        <metric name="leastFrequent">Digit with lowest occurrence count</metric>
+        <metric name="frequency">Percentage of occurrences relative to window size</metric>
+      </metrics>
+    </frequencyAnalysis>
+
+    <signalGeneration>
+      <strategy name="DIGITMATCH">
+        <description>Bets on most frequently occurring digit</description>
+        <trigger>
+          <condition>frequency of most common digit >= threshold</condition>
+          <action>Place DIGITMATCH contract on that digit</action>
+        </trigger>
+      </strategy>
+
+      <strategy name="DIGITDIFF">
+        <description>Bets on least frequently occurring digit NOT appearing</description>
+        <trigger>
+          <condition>frequency of least common digit &lt;= threshold</condition>
+          <action>Place DIGITDIFF contract, predicting other digits will appear</action>
+        </trigger>
+      </strategy>
+    </signalGeneration>
+
+    <riskChecks>
+      <check name="maxLossLimit">
+        <description>Stop trading if cumulative loss reaches limit</description>
+        <condition>session.pl &lt;= -maxLoss</condition>
+        <action>Stop bot immediately</action>
+      </check>
+
+      <check name="maxTradesLimit">
+        <description>Stop trading after maximum number of trades</description>
+        <condition>session.trades >= maxTrades</condition>
+        <action>Stop bot immediately</action>
+      </check>
+
+      <check name="authorization">
+        <description>Ensure authorization before trading</description>
+        <condition>authorized == true</condition>
+        <action>Block trades if not authorized</action>
+      </check>
+
+      <check name="activeContract">
+        <description>Wait for contract settlement before next trade</description>
+        <condition>activeContract == null</condition>
+        <action>Don't place new trade while one is open</action>
+      </check>
+    </riskChecks>
+  </tradingEngine>
+
+  <sessionManagement>
+    <tracking>
+      <stat name="trades">Total number of trades executed</stat>
+      <stat name="wins">Number of winning trades</stat>
+      <stat name="losses">Number of losing trades</stat>
+      <stat name="pl">Cumulative profit/loss</stat>
+      <stat name="winRate">Win percentage</stat>
+    </tracking>
+
+    <state>
+      <value name="OFFLINE">Bot is not connected</value>
+      <value name="CONNECTING">Attempting to establish connection</value>
+      <value name="CONNECTED">WebSocket connected but not authorized</value>
+      <value name="AUTHORIZED">Authorized and ready to trade</value>
+      <value name="RUNNING DEMO">Trading in demo mode</value>
+      <value name="RUNNING REAL">Trading in real money mode</value>
+      <value name="STOPPED">Bot is stopped</value>
+    </state>
+
+    <actions>
+      <action name="start">Start the bot and begin trading</action>
+      <action name="stop">Stop the bot immediately (Emergency Stop)</action>
+      <action name="reset">Reset session statistics</action>
+      <action name="pause">Pause trading temporarily</action>
+    </actions>
+  </sessionManagement>
+
+  <deployment>
+    <options>
+      <option name="browser">
+        <description>Run as HTML/JavaScript in web browser</description>
+        <file>index.html</file>
+        <requirements>
+          <requirement>Modern web browser</requirement>
+          <requirement>Internet connection</requirement>
+          <requirement>Deriv API token</requirement>
+        </requirements>
+        <steps>
+          <step>1. Download index.html</step>
+          <step>2. Open in browser</step>
+          <step>3. Paste API token</step>
+          <step>4. Click Connect</step>
+          <step>5. Click START BOT</step>
+        </steps>
+      </option>
+
+      <option name="nodejs">
+        <description>Run as Node.js server bot</description>
+        <file>bot.js</file>
+        <requirements>
+          <requirement>Node.js v14+</requirement>
+          <requirement>npm</requirement>
+          <requirement>Deriv API token</requirement>
+        </requirements>
+        <steps>
+          <step>1. npm install</step>
+          <step>2. Create .env file with DERIV_TOKEN</step>
+          <step>3. npm start</step>
+          <step>4. Bot runs 24/7</step>
+        </steps>
+      </option>
+
+      <option name="heroku">
+        <description>Deploy to Heroku cloud platform</description>
+        <cost>Free/Paid</cost>
+        <uptime>24/7</uptime>
+        <steps>
+          <step>1. heroku login</step>
+          <step>2. heroku create app-name</step>
+          <step>3. heroku config:set DERIV_TOKEN=token</step>
+          <step>4. git push heroku main</step>
+        </steps>
+      </option>
+
+      <option name="docker">
+        <description>Deploy via Docker container</description>
+        <cost>Any cloud provider</cost>
+        <uptime>24/7</uptime>
+        <steps>
+          <step>1. docker build -t deriv-bot .</step>
+          <step>2. docker run -e DERIV_TOKEN=token deriv-bot</step>
+        </steps>
+      </option>
+
+      <option name="vps">
+        <description>Deploy to Virtual Private Server</description>
+        <cost>$4-20/month</cost>
+        <uptime>24/7</uptime>
+        <providers>
+          <provider>DigitalOcean</provider>
+          <provider>Linode</provider>
+          <provider>AWS EC2</provider>
+          <provider>Vultr</provider>
+        </providers>
+      </option>
+    </options>
+  </deployment>
+
+  <security>
+    <authentication>
+      <method>Deriv API Token</method>
+      <scope>Trade scope required</scope>
+      <storage>Environment variables only (not in code)</storage>
+      <transmission>WSS (WebSocket Secure) encrypted</transmission>
+    </authentication>
+
+    <bestPractices>
+      <practice>Never hardcode API tokens in source code</practice>
+      <practice>Use .env files for configuration</practice>
+      <practice>Add .env to .gitignore to prevent exposure</practice>
+      <practice>Rotate API tokens regularly</practice>
+      <practice>Use different tokens for demo vs real trading</practice>
+      <practice>Monitor trade activity for anomalies</practice>
+      <practice>Keep backup of working configuration</practice>
+    </bestPractices>
+
+    <dataHandling>
+      <storage>Tokens stored only in browser memory or environment variables</storage>
+      <transmission>All data transmitted over WSS (encrypted)</transmission>
+      <logging>Trade logs include price/digit data but not tokens</logging>
+      <privacy>No data sent to external servers except Deriv API</privacy>
+    </dataHandling>
+  </security>
+
+  <disclaimer>
+    <warning priority="high">
+      <text>REAL TRADING CAN RESULT IN TOTAL LOSS OF CAPITAL</text>
+      <advice>Always start with demo mode</advice>
+      <advice>Never risk money you cannot afford to lose</advice>
+      <advice>Frequency analysis does NOT guarantee profits</advice>
+      <advice>Past performance does not predict future results</advice>
+    </warning>
+
+    <strategy>
+      <note>This is a statistical strategy based on digit frequency analysis</note>
+      <note>Frequency patterns are random in nature</note>
+      <note>No trading strategy works 100% of the time</note>
+      <note>Always use proper risk management</note>
+    </strategy>
+
+    <testing>
+      <recommendation>Test in demo mode for at least 100 trades</recommendation>
+      <recommendation>Monitor performance metrics carefully</recommendation>
+      <recommendation>Adjust parameters based on results</recommendation>
+      <recommendation>Never trade live until confident in strategy</recommendation>
+    </testing>
+  </disclaimer>
+
+  <support>
+    <documentation>
+      <file name="README.md">Setup and usage guide</file>
+      <file name="STRATEGY.md">Detailed strategy explanation</file>
+      <file name="DEPLOYMENT.md">Cloud deployment instructions</file>
+    </documentation>
+
+    <resources>
+      <resource>https://developers.deriv.com/ - Deriv API Documentation</resource>
+      <resource>https://app.deriv.com/ - Deriv Trading Platform</resource>
+      <resource>https://github.com/maddy1749/deriv-riff-bot - Repository</resource>
+    </resources>
+
+    <troubleshooting>
+      <issue name="Bot not connecting">
+        <solution>Check internet connection</solution>
+        <solution>Verify API token is valid</solution>
+        <solution>Check if Deriv API is accessible</solution>
+      </issue>
+
+      <issue name="Bot not trading">
+        <solution>Ensure authorization was successful</solution>
+        <solution>Check if balance is sufficient</solution>
+        <solution>Verify threshold settings</solution>
+        <solution>Check if mode is set correctly</solution>
+      </issue>
+
+      <issue name="High CPU/Memory usage">
+        <solution>Reduce analysis window size</solution>
+        <solution>Increase trade delay</solution>
+        <solution>Reduce update frequency</solution>
+      </issue>
+    </troubleshooting>
+  </support>
+
+  <changelog>
+    <version number="1.0.0" date="2026-08-29">
+      <feature>Initial release - Browser and Node.js versions</feature>
+      <feature>Digit frequency analysis engine</feature>
+      <feature>DIGITMATCH and DIGITDIFF strategies</feature>
+      <feature>Risk management (max loss, max trades)</feature>
+      <feature>Live session tracking and statistics</feature>
+      <feature>Multiple deployment options</feature>
+    </version>
+  </changelog>
+
+</derivBot>
