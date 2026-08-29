@@ -1,0 +1,33 @@
+{
+  "name": "deriv-riff-bot",
+  "version": "1.0.0",
+  "description": "Automated trading bot for Deriv platform using digit frequency analysis",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js",
+    "dev": "nodemon bot.js",
+    "build": "webpack --mode production",
+    "test": "jest"
+  },
+  "keywords": [
+    "deriv",
+    "trading",
+    "bot",
+    "automated",
+    "websocket"
+  ],
+  "author": "maddy1749",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.14.2",
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "lodash": "^4.17.21"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "jest": "^29.7.0",
+    "webpack": "^5.89.0",
+    "webpack-cli": "^5.1.4"
+  }
+}
