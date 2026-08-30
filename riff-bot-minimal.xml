@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Bot>
+  <BotName>Riff Bot</BotName>
+  <BotDescription>Digit Frequency Trading Bot</BotDescription>
+  <BotVersion>1.0</BotVersion>
+  <ApiToken></ApiToken>
+  <AccountType>demo</AccountType>
+  <Symbol>R_100</Symbol>
+  <TradeType>DIGITDIFF</TradeType>
+  <Stake>0.35</Stake>
+  <Duration>1</Duration>
+  <MaxLoss>6.00</MaxLoss>
+  <MaxTrades>20</MaxTrades>
+  <AnalysisWindow>500</AnalysisWindow>
+  <Threshold>0.15</Threshold>
+  <TradeDelay>500</TradeDelay>
+  <AutoTrade>true</AutoTrade>
+  <Strategy>digit_frequency</Strategy>
+</Bot>
