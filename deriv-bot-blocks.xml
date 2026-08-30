@@ -1,0 +1,385 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<BlockBot>
+  <metadata>
+    <name>Riff Bot - Digit Frequency</name>
+    <version>1.0</version>
+    <description>Automated trading using digit frequency analysis</description>
+  </metadata>
+
+  <blocks>
+    <!-- START BLOCK -->
+    <block id="start" type="start">
+      <label>Start</label>
+    </block>
+
+    <!-- SET VARIABLES -->
+    <block id="set_digits" type="variables_set">
+      <label>Set digits to empty array</label>
+      <variable>digits</variable>
+      <value>[]</value>
+      <next>set_trades</next>
+    </block>
+
+    <block id="set_trades" type="variables_set">
+      <label>Set trades to 0</label>
+      <variable>trades</variable>
+      <value>0</value>
+      <next>set_wins</next>
+    </block>
+
+    <block id="set_wins" type="variables_set">
+      <label>Set wins to 0</label>
+      <variable>wins</variable>
+      <value>0</value>
+      <next>set_losses</next>
+    </block>
+
+    <block id="set_losses" type="variables_set">
+      <label>Set losses to 0</label>
+      <variable>losses</variable>
+      <value>0</value>
+      <next>set_pl</next>
+    </block>
+
+    <block id="set_pl" type="variables_set">
+      <label>Set profit_loss to 0</label>
+      <variable>profit_loss</variable>
+      <value>0</value>
+      <next>main_loop</next>
+    </block>
+
+    <!-- MAIN LOOP -->
+    <block id="main_loop" type="forever">
+      <label>Repeat Forever</label>
+      <inside>
+        <!-- GET MARKET DATA -->
+        <block id="get_price" type="market_last_price">
+          <label>Get last price of R_100</label>
+          <symbol>R_100</symbol>
+          <next>extract_digit</next>
+        </block>
+
+        <!-- EXTRACT LAST DIGIT -->
+        <block id="extract_digit" type="text_operation">
+          <label>Extract last digit from price</label>
+          <operation>Get last character</operation>
+          <input>get_price.result</input>
+          <store>last_digit</store>
+          <next>add_to_array</next>
+        </block>
+
+        <!-- ADD DIGIT TO ARRAY -->
+        <block id="add_to_array" type="lists_append">
+          <label>Add last_digit to digits array</label>
+          <list>digits</list>
+          <item>last_digit</item>
+          <next>check_window_size</next>
+        </block>
+
+        <!-- CHECK WINDOW SIZE -->
+        <block id="check_window_size" type="controls_if">
+          <label>If digits length > 500</label>
+          <condition>length(digits) > 500</condition>
+          <then>
+            <block id="remove_first" type="lists_remove_index">
+              <label>Remove first item from digits</label>
+              <list>digits</list>
+              <index>1</index>
+              <next>analyze</next>
+            </block>
+          </then>
+          <else>analyze</else>
+        </block>
+
+        <!-- ANALYZE FREQUENCY -->
+        <block id="analyze" type="procedure_call">
+          <label>Analyze digit frequency</label>
+          <procedure>analyze_frequency</procedure>
+          <next>check_signal</next>
+        </block>
+
+        <!-- CHECK FOR SIGNAL -->
+        <block id="check_signal" type="controls_if">
+          <label>If signal generated AND no active contract</label>
+          <condition>signal_generated AND not active_contract</condition>
+          <then>
+            <block id="execute_trade" type="procedure_call">
+              <label>Execute trade</label>
+              <procedure>execute_trade</procedure>
+              <next>check_risk</next>
+            </block>
+          </then>
+          <else>check_risk</else>
+        </block>
+
+        <!-- CHECK RISK LIMITS -->
+        <block id="check_risk" type="controls_if">
+          <label>If profit_loss &lt;= -6 OR trades >= 20</label>
+          <condition>profit_loss &lt;= -6 OR trades >= 20</condition>
+          <then>
+            <block id="stop_bot" type="stop">
+              <label>Stop bot</label>
+            </block>
+          </then>
+          <else>main_loop</else>
+        </block>
+      </inside>
+    </block>
+
+    <!-- PROCEDURE: ANALYZE FREQUENCY -->
+    <procedure id="analyze_frequency">
+      <name>analyze_frequency</name>
+      <description>Analyze digit frequency and generate signal</description>
+      <blocks>
+        <!-- CREATE COUNT ARRAY -->
+        <block id="create_counts" type="variables_set">
+          <label>Set counts to array of 10 zeros</label>
+          <variable>counts</variable>
+          <value>[0,0,0,0,0,0,0,0,0,0]</value>
+          <next>loop_digits</next>
+        </block>
+
+        <!-- LOOP THROUGH DIGITS -->
+        <block id="loop_digits" type="controls_forEach">
+          <label>For each digit in digits array</label>
+          <list>digits</list>
+          <variable>current_digit</variable>
+          <inside>
+            <!-- INCREMENT COUNTER -->
+            <block id="increment_counter" type="math_change">
+              <label>Change counts[current_digit] by 1</label>
+              <variable>counts</variable>
+              <index>current_digit</index>
+              <delta>1</delta>
+            </block>
+          </inside>
+          <next>find_max_min</next>
+        </block>
+
+        <!-- FIND MAX AND MIN -->
+        <block id="find_max_min" type="procedure_call">
+          <label>Find max and min in counts</label>
+          <procedure>find_extremes</procedure>
+          <next>check_threshold</next>
+        </block>
+
+        <!-- CHECK THRESHOLD -->
+        <block id="check_threshold" type="controls_if">
+          <label>If DIGITDIFF and min_frequency &lt;= 0.15</label>
+          <condition>min_frequency &lt;= 0.15</condition>
+          <then>
+            <block id="set_signal" type="variables_set">
+              <label>Set signal_generated to true</label>
+              <variable>signal_generated</variable>
+              <value>true</value>
+              <next>set_target</next>
+            </block>
+            <block id="set_target" type="variables_set">
+              <label>Set signal_target to min_digit</label>
+              <variable>signal_target</variable>
+              <value>min_digit</value>
+            </block>
+          </then>
+          <else>
+            <block id="no_signal" type="variables_set">
+              <label>Set signal_generated to false</label>
+              <variable>signal_generated</variable>
+              <value>false</value>
+            </block>
+          </else>
+        </block>
+      </blocks>
+    </procedure>
+
+    <!-- PROCEDURE: FIND EXTREMES -->
+    <procedure id="find_extremes">
+      <name>find_extremes</name>
+      <description>Find max and min values in counts</description>
+      <blocks>
+        <block id="set_max" type="variables_set">
+          <label>Set max_frequency to 0</label>
+          <variable>max_frequency</variable>
+          <value>0</value>
+          <next>set_min</next>
+        </block>
+
+        <block id="set_min" type="variables_set">
+          <label>Set min_frequency to 1</label>
+          <variable>min_frequency</variable>
+          <value>1</value>
+          <next>loop_counts</next>
+        </block>
+
+        <block id="loop_counts" type="controls_forEach">
+          <label>For each count in counts array</label>
+          <list>counts</list>
+          <variable>count_value</variable>
+          <inside>
+            <block id="check_max" type="controls_if">
+              <label>If count_value > max_frequency</label>
+              <condition>count_value > max_frequency</condition>
+              <then>
+                <block id="update_max" type="variables_set">
+                  <label>Set max_frequency to count_value</label>
+                  <variable>max_frequency</variable>
+                  <value>count_value</value>
+                </block>
+              </then>
+            </block>
+
+            <block id="check_min" type="controls_if">
+              <label>If count_value &lt; min_frequency</label>
+              <condition>count_value &lt; min_frequency</condition>
+              <then>
+                <block id="update_min" type="variables_set">
+                  <label>Set min_frequency to count_value</label>
+                  <variable>min_frequency</variable>
+                  <value>count_value</value>
+                </block>
+              </then>
+            </block>
+          </inside>
+        </block>
+
+        <!-- CALCULATE PERCENTAGES -->
+        <block id="calc_min_pct" type="math_arithmetic">
+          <label>Calculate min_frequency / total digits</label>
+          <operation>divide</operation>
+          <a>min_frequency</a>
+          <b>length(digits)</b>
+          <store>min_frequency_pct</store>
+        </block>
+
+        <!-- FIND DIGIT INDEX -->
+        <block id="find_min_digit" type="lists_indexOf">
+          <label>Find index of min_frequency in counts</label>
+          <list>counts</list>
+          <item>min_frequency</item>
+          <store>min_digit</store>
+        </block>
+      </blocks>
+    </procedure>
+
+    <!-- PROCEDURE: EXECUTE TRADE -->
+    <procedure id="execute_trade">
+      <name>execute_trade</name>
+      <description>Execute a trade with signal target</description>
+      <blocks>
+        <!-- LOG SIGNAL -->
+        <block id="log_signal" type="io_print">
+          <label>Print: SIGNAL - DIGITDIFF on digit [signal_target]</label>
+          <message>SIGNAL - DIGITDIFF on digit {signal_target}</message>
+        </block>
+
+        <!-- INCREMENT TRADE COUNT -->
+        <block id="inc_trades" type="math_change">
+          <label>Change trades by 1</label>
+          <variable>trades</variable>
+          <delta>1</delta>
+          <next>send_proposal</next>
+        </block>
+
+        <!-- SEND PROPOSAL -->
+        <block id="send_proposal" type="trade_proposal">
+          <label>Send proposal request</label>
+          <symbol>R_100</symbol>
+          <contract_type>DIGITDIFF</contract_type>
+          <amount>0.35</amount>
+          <barrier>signal_target</barrier>
+          <duration>1</duration>
+          <duration_unit>t</duration_unit>
+          <next>await_proposal</next>
+        </block>
+
+        <!-- AWAIT PROPOSAL -->
+        <block id="await_proposal" type="trade_wait">
+          <label>Wait for proposal response</label>
+          <timeout>5000</timeout>
+          <next>buy_contract</next>
+        </block>
+
+        <!-- BUY CONTRACT -->
+        <block id="buy_contract" type="trade_buy">
+          <label>Buy contract at proposal price</label>
+          <proposal_id>proposal_response.id</proposal_id>
+          <next>monitor_contract</next>
+        </block>
+
+        <!-- MONITOR CONTRACT -->
+        <block id="monitor_contract" type="trade_monitor">
+          <label>Monitor contract until settlement</label>
+          <contract_id>buy_response.contract_id</contract_id>
+          <next>record_result</next>
+        </block>
+
+        <!-- RECORD RESULT -->
+        <block id="record_result" type="controls_if">
+          <label>If contract profit > 0</label>
+          <condition>contract_profit > 0</condition>
+          <then>
+            <block id="record_win" type="variables_set">
+              <label>Change wins by 1</label>
+              <variable>wins</variable>
+              <delta>1</delta>
+              <next>add_profit</next>
+            </block>
+          </then>
+          <else>
+            <block id="record_loss" type="variables_set">
+              <label>Change losses by 1</label>
+              <variable>losses</variable>
+              <delta>1</delta>
+              <next>add_profit</next>
+            </block>
+          </else>
+        </block>
+
+        <!-- ADD PROFIT/LOSS -->
+        <block id="add_profit" type="math_change">
+          <label>Change profit_loss by contract_profit</label>
+          <variable>profit_loss</variable>
+          <delta>contract_profit</delta>
+          <next>log_result</next>
+        </block>
+
+        <!-- LOG RESULT -->
+        <block id="log_result" type="io_print">
+          <label>Print: Trade result and P/L</label>
+          <message>Result: {contract_profit} | Total P/L: {profit_loss}</message>
+        </block>
+
+        <!-- RESET SIGNAL -->
+        <block id="reset_signal" type="variables_set">
+          <label>Set signal_generated to false</label>
+          <variable>signal_generated</variable>
+          <value>false</value>
+          <next>set_inactive</next>
+        </block>
+
+        <block id="set_inactive" type="variables_set">
+          <label>Set active_contract to false</label>
+          <variable>active_contract</variable>
+          <value>false</value>
+        </block>
+      </blocks>
+    </procedure>
+
+  </blocks>
+
+  <variables>
+    <variable name="digits" type="array" initial="[]">Price digits array</variable>
+    <variable name="trades" type="number" initial="0">Total trades</variable>
+    <variable name="wins" type="number" initial="0">Winning trades</variable>
+    <variable name="losses" type="number" initial="0">Losing trades</variable>
+    <variable name="profit_loss" type="number" initial="0">Cumulative P/L</variable>
+    <variable name="signal_generated" type="boolean" initial="false">Signal flag</variable>
+    <variable name="signal_target" type="number" initial="0">Target digit</variable>
+    <variable name="active_contract" type="boolean" initial="false">Active contract flag</variable>
+    <variable name="counts" type="array" initial="[0,0,0,0,0,0,0,0,0,0]">Digit counts</variable>
+    <variable name="last_digit" type="number" initial="0">Last price digit</variable>
+    <variable name="max_frequency" type="number" initial="0">Max digit frequency</variable>
+    <variable name="min_frequency" type="number" initial="0">Min digit frequency</variable>
+    <variable name="min_digit" type="number" initial="0">Least frequent digit</variable>
+  </variables>
+
+</BlockBot>
